@@ -1599,16 +1599,14 @@ function corriserMontantFR(m, id, montantActuel, devise){
 
 function modifierVirements(m){
   const moisNom = MOIS_FULL[m];
-  const ep_py_est   = CA.perso_py[m]  || 0;
-  const ep_caro_est = CA.perso_caro[m]|| 0;
-  const ret_py_est  = CA.ret_py[m]    || 0;
-  const ret_caro_est= CA.ret_caro[m]  || 0;
-  const e = loadEntries();
-  const dejaModif = hasEntries('perso_py', m);
-  const epPyCur   = dejaModif ? (sumEntries('perso_py',m)||0)   : ep_py_est;
-  const epCaroCur = dejaModif ? (sumEntries('perso_caro',m)||0)  : ep_caro_est;
-  const retPyCur  = dejaModif ? (sumEntries('ret_py',m)||0)      : ret_py_est;
-  const retCaroCur= dejaModif ? (sumEntries('ret_caro',m)||0)    : ret_caro_est;
+  const ep_py_est   = CA.est_ep_py[m]   || 0;
+  const ep_caro_est = CA.est_ep_caro[m]  || 0;
+  const ret_py_est  = CA.est_ret_py[m]   || 0;
+  const ret_caro_est= CA.est_ret_caro[m] || 0;
+  const epPyCur   = hasEntries('ep_py_override',m)   ? sumEntries('ep_py_override',m)   : ep_py_est;
+  const epCaroCur = hasEntries('ep_caro_override',m) ? sumEntries('ep_caro_override',m) : ep_caro_est;
+  const retPyCur  = hasEntries('ret_py_override',m)  ? sumEntries('ret_py_override',m)  : ret_py_est;
+  const retCaroCur= hasEntries('ret_caro_override',m)? sumEntries('ret_caro_override',m): ret_caro_est;
   const nvEpPy = prompt('Épargne PY (estimé: '+ep_py_est+'$) :', epPyCur);
   if(nvEpPy === null) return;
   const nvEpCaro = prompt('Épargne Caro (estimé: '+ep_caro_est+'$) :', epCaroCur);
@@ -1617,23 +1615,30 @@ function modifierVirements(m){
   if(nvRetPy === null) return;
   const nvRetCaro = prompt('Retraite Caro (estimé: '+ret_caro_est+'$) :', retCaroCur);
   if(nvRetCaro === null) return;
-  const vals = {perso_py:parseFloat(nvEpPy),perso_caro:parseFloat(nvEpCaro),ret_py:parseFloat(nvRetPy),ret_caro:parseFloat(nvRetCaro)};
+  const vals = {
+    ep_py_override:    parseFloat(nvEpPy),
+    ep_caro_override:  parseFloat(nvEpCaro),
+    ret_py_override:   parseFloat(nvRetPy),
+    ret_caro_override: parseFloat(nvRetCaro),
+  };
   for(const [k,v] of Object.entries(vals)){
     if(isNaN(v)||v<0){alert('Montant invalide pour '+k);return;}
   }
+  const e = loadEntries();
   Object.entries(vals).forEach(function([cat,montant]){
     if(!e[cat])e[cat]={};
     e[cat][m]=[{id:Date.now(),montant:montant,desc:(montant===0?'Suspendu ':'Modifié ')+moisNom,date:new Date().toLocaleDateString('fr-CA'),_modifie:true}];
   });
   saveEntries(e);
   renderContent();
-  alert('✅ Virements mis à jour pour '+moisNom+'\nÉpargne PY: '+vals.perso_py+'$ · Caro: '+vals.perso_caro+'$\nRetraite PY: '+vals.ret_py+'$ · Caro: '+vals.ret_caro+'$');
+  const tot=vals.ep_py_override+vals.ep_caro_override+vals.ret_py_override+vals.ret_caro_override;
+  alert('✅ Virements mis à jour pour '+moisNom+'\nÉpargne PY: '+vals.ep_py_override+'$ · Caro: '+vals.ep_caro_override+'$\nRetraite PY: '+vals.ret_py_override+'$ · Caro: '+vals.ret_caro_override+'$\nTotal: '+tot+'$');
 }
 
 function annulerModifVirements(m){
   if(!confirm('Rétablir les montants estimés pour '+MOIS_FULL[m]+' ?')) return;
   const e = loadEntries();
-  ['perso_py','perso_caro','ret_py','ret_caro'].forEach(function(cat){
+  ['ep_py_override','ep_caro_override','ret_py_override','ret_caro_override'].forEach(function(cat){
     if(e[cat]&&e[cat][m]) delete e[cat][m];
   });
   saveEntries(e);
@@ -3441,7 +3446,7 @@ function calcSoldeEpPy(upToMonth){
   const epp=CA.epp;
   let s=epp.soldes_n1.ep_py_qc||0;
   for(let i=0;i<=upToMonth;i++){
-    s+=(CA.est_ep_py[i]||0)+sumEntries('ep_py_vers',i);
+    s+=(hasEntries('ep_py_override',i)?sumEntries('ep_py_override',i):(CA.est_ep_py[i]||0))+sumEntries('ep_py_vers',i);
     s+=sumEntries('ca_vers_epp_ep_py_qc',i);
     s-=(epp.debits_excel.perso_py_qc||[])[i]||0;
     s-=sumEntries('epp_deb_epargne',i);
@@ -3453,7 +3458,7 @@ function calcSoldeRetPy(upToMonth){
   const epp=CA.epp;
   let s=epp.soldes_n1.ret_py_qc||0;
   for(let i=0;i<=upToMonth;i++){
-    s+=(CA.est_ret_py[i]||0)+sumEntries('ret_py',i);
+    s+=(hasEntries('ret_py_override',i)?sumEntries('ret_py_override',i):(CA.est_ret_py[i]||0))+sumEntries('ret_py',i);
     s+=sumEntries('ca_vers_epp_ret_py_qc',i);
     s-=sumEntries('epp_deb_retraite',i);
     s-=sumEntries('epp_vir_ret_py_qc',i);
@@ -3464,7 +3469,7 @@ function calcSoldeRetCaro(upToMonth){
   const epc=CA.epc;
   let s=epc.soldes_n1.ret_caro_qc||0;
   for(let i=0;i<=upToMonth;i++){
-    s+=(epc.credits?.ret_caro_qc?.[i]||CA.est_ret_caro[i]||0)+sumEntries('ret_caro',i);
+    s+=(hasEntries('ret_caro_override',i)?sumEntries('ret_caro_override',i):(epc.credits?.ret_caro_qc?.[i]||CA.est_ret_caro[i]||0))+sumEntries('ret_caro',i);
     s+=sumEntries('ca_vers_epc_ret_caro_qc',i);
     s-=sumEntries('epc_deb_retraite',i);
     s-=sumEntries('epc_vir_ret_caro_qc',i);
@@ -3475,7 +3480,7 @@ function calcSoldeEpCaro(upToMonth){
   const epc=CA.epc;
   let s=epc.soldes_n1.ep_caro_qc||0;
   for(let i=0;i<=upToMonth;i++){
-    s+=(epc.credits.ep_caro_qc[i]||CA.est_ep_caro[i]||0)+sumEntries('ep_caro_vers',i);
+    s+=(hasEntries('ep_caro_override',i)?sumEntries('ep_caro_override',i):(epc.credits.ep_caro_qc[i]||CA.est_ep_caro[i]||0))+sumEntries('ep_caro_vers',i);
     s+=sumEntries('ca_vers_epc_ep_caro_qc',i);
     s-=sumEntries('epc_deb_epargne',i);
     s-=sumEntries('epc_vir_ep_caro_qc',i);
@@ -4468,7 +4473,7 @@ function ca_vir_det(){
       </button>
       <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
         <button onclick="modifierVirements(${m})" style="font-size:11px;padding:3px 10px;background:#8e44ad22;color:#8e44ad;border:1px solid #8e44ad44;border-radius:6px;cursor:pointer;">✏️ Modifier virements</button>
-        ${hasEntries('perso_py',m)?'<button onclick="annulerModifVirements('+m+')" style="font-size:11px;padding:3px 10px;background:#27ae6022;color:#27ae60;border:1px solid #27ae6044;border-radius:6px;cursor:pointer;">↩️ Rétablir estimés</button>':''}
+        ${hasEntries('ep_py_override',m)?'<button onclick="annulerModifVirements('+m+')" style="font-size:11px;padding:3px 10px;background:#27ae6022;color:#27ae60;border:1px solid #27ae6044;border-radius:6px;cursor:pointer;">↩️ Rétablir estimés</button>':''}
       </div>
       ${showListe['vir_ep_show_'+m]?`
       <div style="margin-top:10px;">
@@ -4626,10 +4631,10 @@ function calcSoldeCA(mm){
     +sumEntries('remb_imp_py',mm)+sumEntries('remb_imp_caro',mm)
     +(mm>=5?sumEntries('tel_caro_remb',mm):0);  // Indemnité tel Caro (à partir juin 2026)
   // Épargne (virements Excel + manuels + virements CA→comptes épargne)
-  const ep = ((CA.est_ep_py[mm]||0)+sumEntries('ep_py_vers',mm))
-    +((CA.est_ep_caro[mm]||0)+sumEntries('ep_caro_vers',mm))
-    +((CA.est_ret_py[mm]||0)+sumEntries('ret_py',mm))
-    +((CA.est_ret_caro[mm]||0)+sumEntries('ret_caro',mm))
+  const ep = ((hasEntries('ep_py_override',mm)?sumEntries('ep_py_override',mm):(CA.est_ep_py[mm]||0))+sumEntries('ep_py_vers',mm))
+    +((hasEntries('ep_caro_override',mm)?sumEntries('ep_caro_override',mm):(CA.est_ep_caro[mm]||0))+sumEntries('ep_caro_vers',mm))
+    +((hasEntries('ret_py_override',mm)?sumEntries('ret_py_override',mm):(CA.est_ret_py[mm]||0))+sumEntries('ret_py',mm))
+    +((hasEntries('ret_caro_override',mm)?sumEntries('ret_caro_override',mm):(CA.est_ret_caro[mm]||0))+sumEntries('ret_caro',mm))
     // Virements manuels Cpte CA → portefeuilles épargne
     +['revenu_qc','pension_py','arg_commun','bon_coin','voiture','ep_py_qc','ret_py_qc','ebay','interets']
       .reduce((s,p)=>s+sumEntries('ca_vers_epp_'+p,mm),0)
@@ -5167,8 +5172,8 @@ function ca_epp_an(){
     return CATS_IDS.reduce((tot,id)=>{
       let s=epp.soldes_n1[id]||0;
       for(let i=0;i<=upToMonth;i++){
-        if(id==='ep_py_qc'){s+=(CA.est_ep_py[i]||0)+sumEntries('ep_py_vers',i);}
-        if(id==='ret_py_qc'){s+=(CA.est_ret_py[i]||0)+sumEntries('ret_py',i);}
+        if(id==='ep_py_qc'){s+=(hasEntries('ep_py_override',i)?sumEntries('ep_py_override',i):(CA.est_ep_py[i]||0))+sumEntries('ep_py_vers',i);}
+        if(id==='ret_py_qc'){s+=(hasEntries('ret_py_override',i)?sumEntries('ret_py_override',i):(CA.est_ret_py[i]||0))+sumEntries('ret_py',i);}
         if(id==='interets') s+=epp.credits.interets[i]||0;
         s+=sumEntries('epp_cr_'+id,i);
         s+=sumEntries('ca_vers_epp_'+id,i);
@@ -5404,7 +5409,7 @@ function ca_epc_an(){
       for(let i=0;i<=upToMonth;i++){
         if(id==='revenu_qc'){s+=sumEntries('epc_cr_revenu_qc',i);}
         else if(id==='ep_caro_qc'){s+=(CA.est_ep_caro[i]||0)+sumEntries('ep_caro_vers',i);}
-        else if(id==='ret_caro_qc'){s+=(epc.credits?.ret_caro_qc?.[i]||CA.est_ret_caro[i]||0)+sumEntries('ret_caro',i);}
+        else if(id==='ret_caro_qc'){s+=(hasEntries('ret_caro_override',i)?sumEntries('ret_caro_override',i):(epc.credits?.ret_caro_qc?.[i]||CA.est_ret_caro[i]||0))+sumEntries('ret_caro',i);}
         else if(epc.credits[id]) s+=epc.credits[id][i]||0;
         s+=(id==='revenu_qc'?0:sumEntries('epc_cr_'+id,i));
         s+=sumEntries('ca_vers_epc_'+id,i);
