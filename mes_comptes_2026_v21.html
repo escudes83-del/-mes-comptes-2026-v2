@@ -1597,6 +1597,50 @@ function corriserMontantFR(m, id, montantActuel, devise){
   renderContent();
 }
 
+function modifierVirements(m){
+  const moisNom = MOIS_FULL[m];
+  const ep_py_est   = CA.perso_py[m]  || 0;
+  const ep_caro_est = CA.perso_caro[m]|| 0;
+  const ret_py_est  = CA.ret_py[m]    || 0;
+  const ret_caro_est= CA.ret_caro[m]  || 0;
+  const e = loadEntries();
+  const dejaModif = hasEntries('perso_py', m);
+  const epPyCur   = dejaModif ? (sumEntries('perso_py',m)||0)   : ep_py_est;
+  const epCaroCur = dejaModif ? (sumEntries('perso_caro',m)||0)  : ep_caro_est;
+  const retPyCur  = dejaModif ? (sumEntries('ret_py',m)||0)      : ret_py_est;
+  const retCaroCur= dejaModif ? (sumEntries('ret_caro',m)||0)    : ret_caro_est;
+  const nvEpPy = prompt('Épargne PY (estimé: '+ep_py_est+'$) :', epPyCur);
+  if(nvEpPy === null) return;
+  const nvEpCaro = prompt('Épargne Caro (estimé: '+ep_caro_est+'$) :', epCaroCur);
+  if(nvEpCaro === null) return;
+  const nvRetPy = prompt('Retraite PY (estimé: '+ret_py_est+'$) :', retPyCur);
+  if(nvRetPy === null) return;
+  const nvRetCaro = prompt('Retraite Caro (estimé: '+ret_caro_est+'$) :', retCaroCur);
+  if(nvRetCaro === null) return;
+  const vals = {perso_py:parseFloat(nvEpPy),perso_caro:parseFloat(nvEpCaro),ret_py:parseFloat(nvRetPy),ret_caro:parseFloat(nvRetCaro)};
+  for(const [k,v] of Object.entries(vals)){
+    if(isNaN(v)||v<0){alert('Montant invalide pour '+k);return;}
+  }
+  Object.entries(vals).forEach(function([cat,montant]){
+    if(!e[cat])e[cat]={};
+    e[cat][m]=[{id:Date.now(),montant:montant,desc:(montant===0?'Suspendu ':'Modifié ')+moisNom,date:new Date().toLocaleDateString('fr-CA'),_modifie:true}];
+  });
+  saveEntries(e);
+  renderContent();
+  alert('✅ Virements mis à jour pour '+moisNom+'\nÉpargne PY: '+vals.perso_py+'$ · Caro: '+vals.perso_caro+'$\nRetraite PY: '+vals.ret_py+'$ · Caro: '+vals.ret_caro+'$');
+}
+
+function annulerModifVirements(m){
+  if(!confirm('Rétablir les montants estimés pour '+MOIS_FULL[m]+' ?')) return;
+  const e = loadEntries();
+  ['perso_py','perso_caro','ret_py','ret_caro'].forEach(function(cat){
+    if(e[cat]&&e[cat][m]) delete e[cat][m];
+  });
+  saveEntries(e);
+  renderContent();
+  alert('✅ Montants estimés rétablis pour '+MOIS_FULL[m]);
+}
+
 function toggleRecap(){
   recapOpen = !recapOpen;
   const panel = document.getElementById('panel-recap');
@@ -4422,6 +4466,10 @@ function ca_vir_det(){
         <i class="ti ti-${showListe['vir_ep_show_'+m]?'eye-off':'plus'}"></i>
         ${showListe['vir_ep_show_'+m]?'Masquer':'Saisir un virement vers épargne'}
       </button>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+        <button onclick="modifierVirements(${m})" style="font-size:11px;padding:3px 10px;background:#8e44ad22;color:#8e44ad;border:1px solid #8e44ad44;border-radius:6px;cursor:pointer;">✏️ Modifier virements</button>
+        ${hasEntries('perso_py',m)?'<button onclick="annulerModifVirements('+m+')" style="font-size:11px;padding:3px 10px;background:#27ae6022;color:#27ae60;border:1px solid #27ae6044;border-radius:6px;cursor:pointer;">↩️ Rétablir estimés</button>':''}
+      </div>
       ${showListe['vir_ep_show_'+m]?`
       <div style="margin-top:10px;">
         <div style="font-size:11px;color:#8e44ad;font-weight:600;margin-bottom:8px;">
