@@ -1597,9 +1597,11 @@ function corriserMontantFR(m, id, montantActuel, devise){
   renderContent();
 }
 
-function modifierVersement(m, cat, estArr){
+function modifierVersement(m, cat){
   const moisNom = MOIS_FULL[m];
-  const estime = estArr[m] || 0;
+  // Récupérer l'estimé selon la catégorie
+  const estMap = {'ep_py_vers':CA.est_ep_py,'ep_caro_vers':CA.est_ep_caro,'ret_py':CA.est_ret_py,'ret_caro':CA.est_ret_caro};
+  const estime = (estMap[cat]||[])[m] || 0;
   const actuel = sumEntries(cat, m);
   // Montant effectif actuel = estime + saisies manuelles
   const effectif = estime + actuel;
@@ -3416,7 +3418,7 @@ function makeEpView(label,versArr,soldeArr,cat,cmtKey,m,unit,estArr){
       ${combinedBlock(cat,m,u,note?[note]:null,label+' — détail',cat+'_cmt')}
     </div>
     <div style="padding:2px 13px 6px;display:flex;gap:8px;">
-      <button onclick="modifierVersement(${m},'${cat}',estArr)" style="font-size:11px;padding:4px 12px;background:#1a5276;color:#fff;border:none;border-radius:6px;cursor:pointer;">✏️ Modifier</button>
+      <button onclick="modifierVersement(${m},'${cat}')" style="font-size:11px;padding:4px 12px;background:#1a5276;color:#fff;border:none;border-radius:6px;cursor:pointer;">✏️ Modifier</button>
       ${(sumEntries(cat,m)!==0&&loadEntries()[cat]&&(loadEntries()[cat][m]||[]).some(function(x){return x._modifie;}))?`<button onclick="(function(){const e=loadEntries();if(e['${cat}']&&e['${cat}'][${m}]){e['${cat}'][${m}]=e['${cat}'][${m}].filter(function(x){return !x._modifie;});if(!e['${cat}'][${m}].length)delete e['${cat}'][${m}];}saveEntries(e);renderContent();})()" style="font-size:11px;padding:4px 12px;background:#27ae6022;color:#27ae60;border:1px solid #27ae6044;border-radius:6px;cursor:pointer;">↩️ Rétablir</button>`:''}
     </div>
     ${addBlock(cat,m,u,'Versement complémentaire')}
