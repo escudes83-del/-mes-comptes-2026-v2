@@ -3531,6 +3531,9 @@ function makeEpGroupeView(icon,color,colorL,titre,items,m){
           </button>
           ${showListe[vkey]?`<div style="margin-top:8px;">
             ${combinedBlock(it.cat,m,'$CA',null,it.label,it.cat+'_cmt')}
+            <div style="padding:2px 0 6px;display:flex;gap:8px;">
+              <button onclick="modifierVersement(${m},'${it.cat}')" style="font-size:11px;padding:3px 10px;background:#1a5276;color:#fff;border:none;border-radius:6px;cursor:pointer;">✏️ Modifier</button>
+            </div>
             ${addBlock(it.cat,m,'$CA','Versement complémentaire')}
           </div>`:''}
         </div>`;
