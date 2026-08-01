@@ -6044,7 +6044,7 @@ function fr_com_det(){
       +(d.tel_caro[m]?row('Tél. Caro (L52)',d.tel_caro[m],'var(--red)'):'')
       +(d.streaming[m]?row('Netflix/Spotify (L53)',d.streaming[m],'var(--red)'):'')
       +(d.divers[m]?row('Divers (L54)',d.divers[m],'var(--red)'):'')
-      +(d.mutuelle_net[m]?row('Mutuelle nette (L75)',d.mutuelle_net[m],'var(--red)'):'')
+      +(d.mutuelle_net[m]&&!hasEntries('fr_cotis_mut',m)?row('Mutuelle nette (L75)',d.mutuelle_net[m],'var(--red)'):'')
       +`<tr><td style="padding:5px 12px;color:var(--tx2)">Mutuelle — net cotisation
           <button onclick="toggleVue('fr_com_sante_${m}')" style="background:none;border:none;cursor:pointer;color:#E74C3C;font-size:11px;padding:0 4px;">
             <i class="ti ti-heart-rate"></i> Voir Santé</button></td>
