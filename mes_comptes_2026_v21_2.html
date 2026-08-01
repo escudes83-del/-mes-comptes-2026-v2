@@ -1649,19 +1649,13 @@ function corriserCotisMut(m, cotisActuelle){
 function garderSurCA(m, montant){
   const disponible = montant;
   if(!disponible || disponible <= 0){ alert('Aucun montant disponible.'); return; }
-  if(!confirm('Créditer '+fc(disponible)+' sur le Compte Principal CA (remb. frais divers) ?')) return;
-  const e = loadEntries();
-  if(!e['ca_remb_depuis_fr']) e['ca_remb_depuis_fr'] = {};
-  if(!e['ca_remb_depuis_fr'][m]) e['ca_remb_depuis_fr'][m] = [];
-  e['ca_remb_depuis_fr'][m].push({
-    id: Date.now(),
-    montant: disponible,
-    desc: 'Virement Épargne Commun → Compte CA',
-    date: new Date().toLocaleDateString('fr-CA')
-  });
-  saveEntries(e);
+  if(!confirm('Confirmer que '+fc(disponible)+' reste sur le Compte Principal CA (déjà crédité via épargne commune) ?')) return;
+  // Marquer ce mois comme "gardé sur CA" pour masquer l'alerte
+  const gardes = JSON.parse(localStorage.getItem('ep_garde_ca')||'{}');
+  gardes[m] = (gardes[m]||0) + disponible;
+  localStorage.setItem('ep_garde_ca', JSON.stringify(gardes));
   renderContent();
-  alert('✅ '+fc(disponible)+' crédité sur le Compte Principal CA !');
+  alert('✅ Confirmé — '+fc(disponible)+' reste sur le Compte Principal CA.');
 }
 
 function toggleRecap(){
@@ -4418,7 +4412,8 @@ function ca_vir_det(){
     +sumEntries('epc_vir_bon_coin',m)+sumEntries('epc_vir_voiture',m)+sumEntries('epc_vir_ep_caro_qc',m)
     +sumEntries('epc_vir_ret_caro_qc',m)+sumEntries('epc_vir_interets',m);
   const virVersFr = sumEntries('ca_vir_vers_fr',m);
-  const virGardeCA = sumEntries('ca_remb_depuis_fr',m);
+  const _gardeCA = JSON.parse(localStorage.getItem('ep_garde_ca')||'{}');
+  const virGardeCA = _gardeCA[m] || 0;
   // Exclut Pension PY : utilisé aussi pour d'autres destinations que la France (ex: Cpte PPL)
   const _dispo = Math.round((virEPP+virEPC-sumEntries('epp_vir_pension_py',m)-virVersFr)*100)/100;
   // Variables needed by the dynamic blocks
@@ -4754,7 +4749,8 @@ function ca_solde_det(){
   // Total destiné spécifiquement à la France : exclut Pension PY (utilisé aussi pour d'autres destinations, ex: Cpte PPL)
   const totalVirEpFrance = Math.round((totalVirEp - sumEntries('epp_vir_pension_py',m) - sumEntries('epcom_vir_pension_py',m))*100)/100;
   const virVersFr = sumEntries('ca_vir_vers_fr',m);
-  const virGardeCA = sumEntries('ca_remb_depuis_fr',m);
+  const _gardeCA = JSON.parse(localStorage.getItem('ep_garde_ca')||'{}');
+  const virGardeCA = _gardeCA[m] || 0;
 
   // Détail des virements reçus par portefeuille (pour affichage)
   function virDetail(prefix, cats){
