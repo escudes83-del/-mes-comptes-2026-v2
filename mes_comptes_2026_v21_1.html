@@ -5800,7 +5800,7 @@ function fr_com_det(){
       +(d.perso_caro[mm]||0)+sumEntries('fr_retrait_caro',mm)+sumEntries('fr_sante_caro',mm)+sumEntries('fr_perso_caro_div',mm)+(d.logement[mm]||0)+(d.credit[mm]||0)
       +(d.menage[mm]||0)+sumEntries('fr_menage',mm)+(d.eau[mm]||0)+(d.edf[mm]||0)+(d.tel_py[mm]||0)+(d.tel_caro[mm]||0)
       +(d.streaming[mm]||0)+(d.divers[mm]||0)
-      +(d.mutuelle_net[mm]?d.mutuelle_net[mm]:(hasEntries('fr_cotis_mut',mm)?sumEntries('fr_cotis_mut',mm):(d.mut_cotis[mm]||0)))
+      +(hasEntries('fr_cotis_mut',mm)?sumEntries('fr_cotis_mut',mm):(d.mutuelle_net[mm]||d.mut_cotis[mm]||0))
       +(d.frais_div[mm]||0)+sumEntries('fr_frais_div',mm)
       -(d.remb_frais_div[mm]||0)-(d.secu_sociale[mm]||0)-(d.remise_cheq[mm]||0)
       +sumEntries('fr_com_dep',mm)
@@ -5854,7 +5854,7 @@ function fr_com_det(){
     +(d.perso_caro[m]||0)+sumEntries('fr_retrait_caro',m)+sumEntries('fr_sante_caro',m)+sumEntries('fr_perso_caro_div',m)+(d.logement[m]||0)+(d.credit[m]||0)
     +(d.menage[m]||0)+sumEntries('fr_menage',m)+(d.eau[m]||0)+(d.edf[m]||0)+(d.tel_py[m]||0)+(d.tel_caro[m]||0)
     +(d.streaming[m]||0)+(d.divers[m]||0)
-    +(d.mutuelle_net[m]?d.mutuelle_net[m]:(hasEntries('fr_cotis_mut',m)?sumEntries('fr_cotis_mut',m):(d.mut_cotis[m]||0)))
+    +(hasEntries('fr_cotis_mut',m)?sumEntries('fr_cotis_mut',m):(d.mutuelle_net[m]||d.mut_cotis[m]||0))
     +(d.frais_div[m]||0)+sumEntries('fr_frais_div',m)
     -( d.remb_frais_div[m]||0)-(d.secu_sociale[m]||0)-(d.remise_cheq[m]||0)
     +sumEntries('fr_com_dep',m);
