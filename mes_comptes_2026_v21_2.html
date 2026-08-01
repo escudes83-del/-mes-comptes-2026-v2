@@ -1646,17 +1646,9 @@ function corriserCotisMut(m, cotisActuelle){
   renderContent();
 }
 
-function garderSurCA(m){
-  const disponible = (function(){
-    // Recalculer le disponible
-    const e = loadEntries();
-    let total = 0;
-    ['revenu_qc','ep_caro','pension_py','arg_commun','perso_caro','perso_py','bon_coin','voiture','ep_py','ebay','interets']
-      .forEach(function(p){ total += sumEntries('ca_vers_epcom_'+p, m); });
-    const virFr = sumEntries('ca_vir_vers_fr', m);
-    return Math.round((total - virFr)*100)/100;
-  })();
-  if(disponible <= 0){ alert('Aucun montant disponible.'); return; }
+function garderSurCA(m, montant){
+  const disponible = montant;
+  if(!disponible || disponible <= 0){ alert('Aucun montant disponible.'); return; }
   if(!confirm('Créditer '+fc(disponible)+' sur le Compte Principal CA (remb. frais divers) ?')) return;
   const e = loadEntries();
   if(!e['ca_remb_depuis_fr']) e['ca_remb_depuis_fr'] = {};
@@ -4845,7 +4837,7 @@ function ca_solde_det(){
           +'<div style="font-size:24px;font-weight:700;color:#c0392b;margin-bottom:10px;text-align:center;animation:pulse-amount 1s ease-in-out infinite;">'+fc(disponible)+'</div>'
           +'<div style="display:flex;gap:8px;justify-content:center;margin-top:8px;">'
           +'<button onclick="switchTab(\'revenus\');toggleVue(\'vir_ep_show_\'+selM)" style="font-size:11px;padding:5px 12px;background:#c0392b;color:#fff;border:none;border-radius:6px;cursor:pointer;">🏦 Officialiser vers France</button>'
-          +'<button onclick="garderSurCA('+m+')" style="font-size:11px;padding:5px 12px;background:#27ae60;color:#fff;border:none;border-radius:6px;cursor:pointer;">✅ Garder sur compte CA</button>'
+          +'<button onclick="garderSurCA('+m+','+disponible+')" style="font-size:11px;padding:5px 12px;background:#27ae60;color:#fff;border:none;border-radius:6px;cursor:pointer;">✅ Garder sur compte CA</button>'
           +'</div>'
           +'</div>';
       })()}
