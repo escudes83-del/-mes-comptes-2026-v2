@@ -1597,48 +1597,53 @@ function corriserMontantFR(m, id, montantActuel, devise){
   renderContent();
 }
 
-function modifierVirements(m){
+function modifierVersement(m, cat){
   const moisNom = MOIS_FULL[m];
-  const ep_py_est   = CA.perso_py[m]  || 0;
-  const ep_caro_est = CA.perso_caro[m]|| 0;
-  const ret_py_est  = CA.ret_py[m]    || 0;
-  const ret_caro_est= CA.ret_caro[m]  || 0;
+  // Récupérer l'estimé selon la catégorie
+  const estMap = {'ep_py_vers':CA.est_ep_py,'ep_caro_vers':CA.est_ep_caro,'ret_py':CA.est_ret_py,'ret_caro':CA.est_ret_caro};
+  const estime = (estMap[cat]||[])[m] || 0;
+  const actuel = sumEntries(cat, m);
+  // Montant effectif actuel = estime + saisies manuelles
+  const effectif = estime + actuel;
+  const nv = prompt('Montant versement '+moisNom+' (estimé: '+estime+'$) :', effectif);
+  if(nv === null) return;
+  const voulu = parseFloat(nv.replace(',','.'));
+  if(isNaN(voulu) || voulu < 0){ alert('Montant invalide.'); return; }
+  // Différence à saisir = voulu - estime (peut être négatif)
+  const diff = Math.round((voulu - estime) * 100) / 100;
   const e = loadEntries();
-  const dejaModif = hasEntries('perso_py', m);
-  const epPyCur   = dejaModif ? (sumEntries('perso_py',m)||0)   : ep_py_est;
-  const epCaroCur = dejaModif ? (sumEntries('perso_caro',m)||0)  : ep_caro_est;
-  const retPyCur  = dejaModif ? (sumEntries('ret_py',m)||0)      : ret_py_est;
-  const retCaroCur= dejaModif ? (sumEntries('ret_caro',m)||0)    : ret_caro_est;
-  const nvEpPy = prompt('Épargne PY (estimé: '+ep_py_est+'$) :', epPyCur);
-  if(nvEpPy === null) return;
-  const nvEpCaro = prompt('Épargne Caro (estimé: '+ep_caro_est+'$) :', epCaroCur);
-  if(nvEpCaro === null) return;
-  const nvRetPy = prompt('Retraite PY (estimé: '+ret_py_est+'$) :', retPyCur);
-  if(nvRetPy === null) return;
-  const nvRetCaro = prompt('Retraite Caro (estimé: '+ret_caro_est+'$) :', retCaroCur);
-  if(nvRetCaro === null) return;
-  const vals = {perso_py:parseFloat(nvEpPy),perso_caro:parseFloat(nvEpCaro),ret_py:parseFloat(nvRetPy),ret_caro:parseFloat(nvRetCaro)};
-  for(const [k,v] of Object.entries(vals)){
-    if(isNaN(v)||v<0){alert('Montant invalide pour '+k);return;}
+  if(!e[cat]) e[cat] = {};
+  if(diff === 0){
+    // Supprimer les entrées de modification si on revient à l'estimé
+    if(e[cat][m]) e[cat][m] = e[cat][m].filter(function(x){ return !x._modifie; });
+    if(!e[cat][m] || !e[cat][m].length) delete e[cat][m];
+  } else {
+    // Remplacer ou ajouter une entrée de modification
+    const existing = (e[cat][m] || []).filter(function(x){ return !x._modifie; });
+    existing.push({
+      id: Date.now(),
+      montant: diff,
+      desc: (voulu === 0 ? 'Suspendu ' : 'Modifié ') + moisNom,
+      date: new Date().toLocaleDateString('fr-CA'),
+      _modifie: true
+    });
+    e[cat][m] = existing;
   }
-  Object.entries(vals).forEach(function([cat,montant]){
-    if(!e[cat])e[cat]={};
-    e[cat][m]=[{id:Date.now(),montant:montant,desc:(montant===0?'Suspendu ':'Modifié ')+moisNom,date:new Date().toLocaleDateString('fr-CA'),_modifie:true}];
-  });
   saveEntries(e);
   renderContent();
-  alert('✅ Virements mis à jour pour '+moisNom+'\nÉpargne PY: '+vals.perso_py+'$ · Caro: '+vals.perso_caro+'$\nRetraite PY: '+vals.ret_py+'$ · Caro: '+vals.ret_caro+'$');
 }
 
-function annulerModifVirements(m){
-  if(!confirm('Rétablir les montants estimés pour '+MOIS_FULL[m]+' ?')) return;
+function corriserCotisMut(m, cotisActuelle){
+  const moisNom = MOIS_FULL[m];
+  const nv = prompt('Cotisation mutuelle réelle ' + moisNom + ' (€) :', cotisActuelle);
+  if(nv === null) return;
+  const v = parseFloat(nv.replace(',','.'));
+  if(isNaN(v) || v <= 0){ alert('Montant invalide.'); return; }
   const e = loadEntries();
-  ['perso_py','perso_caro','ret_py','ret_caro'].forEach(function(cat){
-    if(e[cat]&&e[cat][m]) delete e[cat][m];
-  });
+  if(!e['fr_cotis_mut']) e['fr_cotis_mut'] = {};
+  e['fr_cotis_mut'][m] = [{id:Date.now(),montant:v,desc:'Cotisation '+moisNom,date:new Date().toLocaleDateString('fr-CA'),_corrige:true}];
   saveEntries(e);
   renderContent();
-  alert('✅ Montants estimés rétablis pour '+MOIS_FULL[m]);
 }
 
 function toggleRecap(){
@@ -3425,6 +3430,10 @@ function makeEpView(label,versArr,soldeArr,cat,cmtKey,m,unit,estArr){
     <div style="padding:4px 13px 8px">
       ${combinedBlock(cat,m,u,note?[note]:null,label+' — détail',cat+'_cmt')}
     </div>
+    <div style="padding:2px 13px 6px;display:flex;gap:8px;">
+      <button onclick="modifierVersement(${m},'${cat}')" style="font-size:11px;padding:4px 12px;background:#1a5276;color:#fff;border:none;border-radius:6px;cursor:pointer;">✏️ Modifier</button>
+      ${(sumEntries(cat,m)!==0&&loadEntries()[cat]&&(loadEntries()[cat][m]||[]).some(function(x){return x._modifie;}))?`<button onclick="(function(){const e=loadEntries();if(e['${cat}']&&e['${cat}'][${m}]){e['${cat}'][${m}]=e['${cat}'][${m}].filter(function(x){return !x._modifie;});if(!e['${cat}'][${m}].length)delete e['${cat}'][${m}];}saveEntries(e);renderContent();})()" style="font-size:11px;padding:4px 12px;background:#27ae6022;color:#27ae60;border:1px solid #27ae6044;border-radius:6px;cursor:pointer;">↩️ Rétablir</button>`:''}
+    </div>
     ${addBlock(cat,m,u,'Versement complémentaire')}
   </div>
   <div class="card"><div class="ch"><div class="ct">Évolution — 2026</div></div>
@@ -3535,6 +3544,9 @@ function makeEpGroupeView(icon,color,colorL,titre,items,m){
           </button>
           ${showListe[vkey]?`<div style="margin-top:8px;">
             ${combinedBlock(it.cat,m,'$CA',null,it.label,it.cat+'_cmt')}
+            <div style="padding:2px 0 6px;display:flex;gap:8px;">
+              <button onclick="modifierVersement(${m},'${it.cat}')" style="font-size:11px;padding:3px 10px;background:#1a5276;color:#fff;border:none;border-radius:6px;cursor:pointer;">✏️ Modifier</button>
+            </div>
             ${addBlock(it.cat,m,'$CA','Versement complémentaire')}
           </div>`:''}
         </div>`;
@@ -4466,10 +4478,6 @@ function ca_vir_det(){
         <i class="ti ti-${showListe['vir_ep_show_'+m]?'eye-off':'plus'}"></i>
         ${showListe['vir_ep_show_'+m]?'Masquer':'Saisir un virement vers épargne'}
       </button>
-      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
-        <button onclick="modifierVirements(${m})" style="font-size:11px;padding:3px 10px;background:#8e44ad22;color:#8e44ad;border:1px solid #8e44ad44;border-radius:6px;cursor:pointer;">✏️ Modifier virements</button>
-        ${hasEntries('perso_py',m)?'<button onclick="annulerModifVirements('+m+')" style="font-size:11px;padding:3px 10px;background:#27ae6022;color:#27ae60;border:1px solid #27ae6044;border-radius:6px;cursor:pointer;">↩️ Rétablir estimés</button>':''}
-      </div>
       ${showListe['vir_ep_show_'+m]?`
       <div style="margin-top:10px;">
         <div style="font-size:11px;color:#8e44ad;font-weight:600;margin-bottom:8px;">
@@ -5792,7 +5800,7 @@ function fr_com_det(){
       +(d.perso_caro[mm]||0)+sumEntries('fr_retrait_caro',mm)+sumEntries('fr_sante_caro',mm)+sumEntries('fr_perso_caro_div',mm)+(d.logement[mm]||0)+(d.credit[mm]||0)
       +(d.menage[mm]||0)+sumEntries('fr_menage',mm)+(d.eau[mm]||0)+(d.edf[mm]||0)+(d.tel_py[mm]||0)+(d.tel_caro[mm]||0)
       +(d.streaming[mm]||0)+(d.divers[mm]||0)
-      +(d.mutuelle_net[mm]?d.mutuelle_net[mm]:(d.mut_cotis[mm]||0)+sumEntries('fr_cotis_mut',mm))
+      +(d.mutuelle_net[mm]?d.mutuelle_net[mm]:(hasEntries('fr_cotis_mut',mm)?sumEntries('fr_cotis_mut',mm):(d.mut_cotis[mm]||0)))
       +(d.frais_div[mm]||0)+sumEntries('fr_frais_div',mm)
       -(d.remb_frais_div[mm]||0)-(d.secu_sociale[mm]||0)-(d.remise_cheq[mm]||0)
       +sumEntries('fr_com_dep',mm)
@@ -5846,7 +5854,7 @@ function fr_com_det(){
     +(d.perso_caro[m]||0)+sumEntries('fr_retrait_caro',m)+sumEntries('fr_sante_caro',m)+sumEntries('fr_perso_caro_div',m)+(d.logement[m]||0)+(d.credit[m]||0)
     +(d.menage[m]||0)+sumEntries('fr_menage',m)+(d.eau[m]||0)+(d.edf[m]||0)+(d.tel_py[m]||0)+(d.tel_caro[m]||0)
     +(d.streaming[m]||0)+(d.divers[m]||0)
-    +(d.mutuelle_net[m]?d.mutuelle_net[m]:(d.mut_cotis[m]||0)+sumEntries('fr_cotis_mut',m))
+    +(d.mutuelle_net[m]?d.mutuelle_net[m]:(hasEntries('fr_cotis_mut',m)?sumEntries('fr_cotis_mut',m):(d.mut_cotis[m]||0)))
     +(d.frais_div[m]||0)+sumEntries('fr_frais_div',m)
     -( d.remb_frais_div[m]||0)-(d.secu_sociale[m]||0)-(d.remise_cheq[m]||0)
     +sumEntries('fr_com_dep',m);
@@ -6041,7 +6049,7 @@ function fr_com_det(){
           <button onclick="toggleVue('fr_com_sante_${m}')" style="background:none;border:none;cursor:pointer;color:#E74C3C;font-size:11px;padding:0 4px;">
             <i class="ti ti-heart-rate"></i> Voir Santé</button></td>
          <td class="amt neg" style="padding:5px 12px">${fe(
-           (FR.mutuelle_cotis[m]||FR.commun.mut_cotis[m]||0)+sumEntries('fr_cotis_mut',m)
+           (hasEntries('fr_cotis_mut',m)?sumEntries('fr_cotis_mut',m):(FR.mutuelle_cotis[m]||FR.commun.mut_cotis[m]||0))
          )}</td></tr>`
       
     +`</tbody></table>
@@ -6156,7 +6164,7 @@ function fr_com_det(){
         <div style="font-size:13px;font-weight:600;color:#E74C3C"><i class="ti ti-heart-rate"></i> Santé & Mutuelle — ${MOIS_FULL[m]}</div>
         <div style="display:flex;align-items:center;gap:10px;">
           <span style="font-size:12px;color:#E74C3C">${fe(
-            (FR.mutuelle_cotis[m]||FR.commun.mut_cotis[m]||0)+sumEntries('fr_cotis_mut',m)
+            (hasEntries('fr_cotis_mut',m)?sumEntries('fr_cotis_mut',m):(FR.mutuelle_cotis[m]||FR.commun.mut_cotis[m]||0))
             -(sumEntries('fr_mut_remb',m)+sumEntries('fr_mut_remb_py',m)+sumEntries('fr_mut_remb_caro',m)+sumEntries('fr_mut_remb_adr',m))
             -(sumEntries('fr_secu_py',m)+sumEntries('fr_secu_caro',m)+sumEntries('fr_secu_adr',m))
           )} net mutuelle</span>
@@ -8497,7 +8505,7 @@ function fr_cel(){
 
 function fr_mut_det(){
   const m=selM;
-  const cotis=(FR.mutuelle_cotis[m]||FR.commun.mut_cotis[m]||0)+sumEntries('fr_cotis_mut',m);
+  const cotis=(hasEntries('fr_cotis_mut',m)?sumEntries('fr_cotis_mut',m):(FR.mutuelle_cotis[m]||FR.commun.mut_cotis[m]||0));
   const netExcel=FR.mutuelle_net[m]||0;
   const rembMutEx=(netExcel>0&&(FR.mutuelle_cotis[m]||0)>0)?Math.max(0,(FR.mutuelle_cotis[m]||0)-netExcel):0;
   const rembMut=rembMutEx+sumEntries('fr_mut_remb_py',m)+sumEntries('fr_mut_remb_caro',m)+sumEntries('fr_mut_remb_adr',m);
@@ -8669,7 +8677,7 @@ function makeFrPenView(m){
 }
 function fr_sante_inline(m){
   const cotisExcel=(FR.mutuelle_cotis[m]||FR.commun.mut_cotis[m]||0);
-  const cotis=cotisExcel+sumEntries('fr_cotis_mut',m);
+  const cotis=hasEntries('fr_cotis_mut',m)?sumEntries('fr_cotis_mut',m):cotisExcel;
   const netExcel=FR.mutuelle_net[m]||0;
   const rembMutEx=(netExcel>0&&cotisExcel>0)?Math.max(0,cotisExcel-netExcel):0;
   const rembMutPY=sumEntries('fr_mut_remb_py',m);
