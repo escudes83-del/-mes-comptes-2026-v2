@@ -4426,6 +4426,7 @@ function ca_vir_det(){
     +sumEntries('epc_vir_bon_coin',m)+sumEntries('epc_vir_voiture',m)+sumEntries('epc_vir_ep_caro_qc',m)
     +sumEntries('epc_vir_ret_caro_qc',m)+sumEntries('epc_vir_interets',m);
   const virVersFr = sumEntries('ca_vir_vers_fr',m);
+  const virGardeCA = sumEntries('ca_remb_depuis_fr',m);
   // Exclut Pension PY : utilisé aussi pour d'autres destinations que la France (ex: Cpte PPL)
   const _dispo = Math.round((virEPP+virEPC-sumEntries('epp_vir_pension_py',m)-virVersFr)*100)/100;
   // Variables needed by the dynamic blocks
@@ -4761,6 +4762,7 @@ function ca_solde_det(){
   // Total destiné spécifiquement à la France : exclut Pension PY (utilisé aussi pour d'autres destinations, ex: Cpte PPL)
   const totalVirEpFrance = Math.round((totalVirEp - sumEntries('epp_vir_pension_py',m) - sumEntries('epcom_vir_pension_py',m))*100)/100;
   const virVersFr = sumEntries('ca_vir_vers_fr',m);
+  const virGardeCA = sumEntries('ca_remb_depuis_fr',m);
 
   // Détail des virements reçus par portefeuille (pour affichage)
   function virDetail(prefix, cats){
@@ -4834,7 +4836,7 @@ function ca_solde_det(){
       </div>`).join('')}
 
       ${(function(){
-        const disponible = Math.round((totalVirEpFrance - virVersFr)*100)/100;
+        const disponible = Math.round((totalVirEpFrance - virVersFr - virGardeCA)*100)/100;
         if(disponible <= 0) return '';
         return '<div style="margin-bottom:12px;border:1.5px dashed #c0392b;border-radius:8px;padding:10px 12px;background:#fff5f5;">'
           +'<div style="font-size:11px;color:#c0392b;font-weight:600;margin-bottom:6px;">'
