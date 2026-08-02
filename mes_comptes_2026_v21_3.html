@@ -1658,6 +1658,31 @@ function garderSurCA(m, montant){
   alert('✅ Confirmé — '+fc(disponible)+' reste sur le Compte Principal CA.');
 }
 
+function modifierVirLB(m, cat, estCle){
+  const moisNom = MOIS_FULL[m];
+  const estArr = FR.commun[estCle] || [];
+  const estime = estArr[m] || 0;
+  const actuel = sumEntries(cat, m);
+  const effectif = estime + actuel;
+  const nv = prompt('Virement Livret B — ' + moisNom + ' (estimé: ' + estime + '€) :', effectif);
+  if(nv === null) return;
+  const voulu = parseFloat(nv.replace(',','.'));
+  if(isNaN(voulu) || voulu < 0){ alert('Montant invalide.'); return; }
+  const diff = Math.round((voulu - estime) * 100) / 100;
+  const e = loadEntries();
+  if(!e[cat]) e[cat] = {};
+  if(diff === 0){
+    if(e[cat][m]) e[cat][m] = e[cat][m].filter(function(x){ return !x._modifie; });
+    if(!e[cat][m] || !e[cat][m].length) delete e[cat][m];
+  } else {
+    const existing = (e[cat][m] || []).filter(function(x){ return !x._modifie; });
+    existing.push({id:Date.now(),montant:diff,desc:(voulu===0?'Suspendu ':'Modifié ')+moisNom,date:new Date().toLocaleDateString('fr-CA'),_modifie:true});
+    e[cat][m] = existing;
+  }
+  saveEntries(e);
+  renderContent();
+}
+
 function toggleRecap(){
   recapOpen = !recapOpen;
   const panel = document.getElementById('panel-recap');
@@ -6440,14 +6465,11 @@ function fr_lb_det_fn(){
       const ePensionPY  = getEntries('fr_vir_lb_pens_py',m);
       const eEpPY       = getEntries('fr_vir_lb_ep_py',m);
       const eEpCaro     = getEntries('fr_vir_lb_ep_caro',m);
-      function crRowMod(label, total, entries, key, cat, estCle, m){
+      function crRowMod(label, total, entries, key, cat, estCle, mm){
         const html = crRow(label, total, entries, key);
-        const estime = (FR.commun[estCle]||[])[m]||0;
-        const effectif = estime + sumEntries(cat,m);
-        const btnModif = '<button onclick="modifierVirLB('+m+',\''+cat+'\',\''+estCle+'\')" '
-          +'style="font-size:10px;padding:1px 6px;background:#1a5276;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:6px;" '
-          +'title="Modifier">✏️ '+effectif+'€</button>';
-        // Insérer le bouton dans la première cellule
+        const estime = (FR.commun[estCle]||[])[mm]||0;
+        const effectif = Math.round((estime + sumEntries(cat,mm))*100)/100;
+        const btnModif = '<button onclick="modifierVirLB('+mm+',\''+cat+'\',\''+estCle+'\')" style="font-size:10px;padding:1px 6px;background:#1a5276;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:6px;">✏️ '+effectif+'€</button>';
         return html.replace(label, label+btnModif);
       }
       return crRow('🏠 Frais Maison PY',virMaisonPY,eMaisonPY,'lb_cr_maison_py')
