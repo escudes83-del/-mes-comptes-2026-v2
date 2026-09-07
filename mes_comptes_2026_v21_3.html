@@ -2165,6 +2165,7 @@ function amountKeyFilter(e){
 
 function sumEntries(cat,m){ return getEntries(cat,m).reduce((s,x)=>s+x.montant,0); }
 function hasEntries(cat,m){ return getEntries(cat,m).length>0; }
+function sumEntriesJusqua(cat,m,jusquau){ return getEntries(cat,m).filter(x=>x.date<=jusquau).reduce((s,x)=>s+x.montant,0); }
 function sumFixed(arr,m){ return arr[m]||0; }
 
 function f(n,u='€'){
@@ -4753,6 +4754,91 @@ function calcSoldeCA(mm){
 function calcSoldeReel(m){ return calcSoldeCA(m); }
 function calcSoldeEstime(m){ return calcSoldeCA(m); }
 
+// Solde au jour J : les postes fixes/récurrents (loyer, garde-meuble, assurance
+// logement, abonnements, téléphone, métro, épargne automatique) sont comptés
+// comme dans calcSoldeCA (baseline tant qu'aucune correction n'existe), SANS
+// filtre de date — ils sont prélevés/virés tôt dans le mois par un ordre
+// permanent, donc déjà passés en banque qu'une saisie existe ou non. Seuls
+// les postes variables (salaire, ménage, perso, divers, virements manuels
+// vers/depuis les épargnes) ne comptent que pour leurs saisies réellement
+// datées <= jusquau (jamais la baseline) — un salaire ou une dépense pas
+// encore survenu(e) ne doit pas gonfler le solde. Sert à vérifier que toutes
+// les opérations déjà survenues ont bien été saisies : ce nombre doit
+// correspondre au solde réel affiché par la banque à la date jusquau.
+function calcSoldeCAJour(mm, jusquau){
+  if(mm<0) return SOLDE_INIT;
+  // Épargne automatique récurrente (fixe, non datée)
+  const epFixe = ((CA.est_ep_py[mm]||0)+sumEntries('ep_py_vers',mm))
+    +((CA.est_ep_caro[mm]||0)+sumEntries('ep_caro_vers',mm))
+    +((CA.est_ret_py[mm]||0)+sumEntries('ret_py',mm))
+    +((CA.est_ret_caro[mm]||0)+sumEntries('ret_caro',mm));
+  // Frais fixes (fixe, non daté) — même calcul que calcSoldeCA
+  const logCorr=sumEntries('log_mtl',mm); const elecCorr=sumEntries('elec_apt',mm);
+  const elecHasEntry=(()=>{const e=loadEntries();return e['elec_apt']&&e['elec_apt'][mm]&&e['elec_apt'][mm].length>0;})();
+  const gmCorr=sumEntries('gm_cor',mm); const alCorr=sumEntries('ass_log_cor',mm);
+  const tpyCorr=sumEntries('tel_py',mm); const tcaCorr=sumEntries('tel_caro_v',mm);
+  const mpyCorr=sumEntries('metro_py_v',mm); const mcaCorr=sumEntries('metro_caro_v',mm);
+  const logement=logCorr?logCorr:(CA.logement[mm]||0);
+  const elec=elecHasEntry?elecCorr:(CA.elec[mm]||0);
+  const gardeMeuble=gmCorr?gmCorr:(CA.garde_meuble[mm]||0);
+  const assLog=alCorr?alCorr:(CA.ass_log[mm]||0);
+  const e2026=loadEntries();
+  const nfHas=e2026['netflix_v']&&e2026['netflix_v'][mm]&&e2026['netflix_v'][mm].length>0;
+  const spHas=e2026['spotify_v']&&e2026['spotify_v'][mm]&&e2026['spotify_v'][mm].length>0;
+  const vdHas=e2026['videotron_v']&&e2026['videotron_v'][mm]&&e2026['videotron_v'][mm].length>0;
+  const tpyHas=e2026['tel_py']&&e2026['tel_py'][mm]&&e2026['tel_py'][mm].length>0;
+  const tcaHas=e2026['tel_caro_v']&&e2026['tel_caro_v'][mm]&&e2026['tel_caro_v'][mm].length>0;
+  const mpyHas=e2026['metro_py_v']&&e2026['metro_py_v'][mm]&&e2026['metro_py_v'][mm].length>0;
+  const mcaHas=e2026['metro_caro_v']&&e2026['metro_caro_v'][mm]&&e2026['metro_caro_v'][mm].length>0;
+  const netflix=nfHas?sumEntries('netflix_v',mm):(CA.netflix[mm]||0);
+  const spotify=spHas?sumEntries('spotify_v',mm):(CA.spotify[mm]||0);
+  const videotron=vdHas?sumEntries('videotron_v',mm):(CA.videotron[mm]||0);
+  const telPY=tpyHas?tpyCorr:(CA.tel_py[mm]||0);
+  const telCaro=tcaHas?tcaCorr:(CA.tel_caro[mm]||0);
+  const metroPY=mpyHas?mpyCorr:(CA.metro_py[mm]||0);
+  const metroCaro=mcaHas?mcaCorr:(CA.metro_caro[mm]||0);
+  const fixes = logement+elec+gardeMeuble+assLog+netflix+spotify+videotron+telPY+telCaro+metroPY+metroCaro+sumEntries('bixi_py',mm);
+  // Ménage — la part Excel (baseline) est fixe/non datée comme dans calcSoldeCA
+  const menBaseline = (CA.menage_iga[mm]||0)+(CA.menage_topd[mm]||0)+(CA.menage_saq[mm]||0)
+    +(CA.menage_pharma[mm]||0)+(CA.menage_jt[mm]||0)+(CA.menage_atelier[mm]||0)+(CA.menage_autres[mm]||0);
+
+  // Postes variables/datés — uniquement les saisies réellement datées <= jusquau
+  const revDate = sumEntriesJusqua('sal_py',mm,jusquau)+sumEntriesJusqua('sal_caro',mm,jusquau)
+    +sumEntriesJusqua('ass_emp_py',mm,jusquau)+sumEntriesJusqua('ass_emp_caro',mm,jusquau)
+    +sumEntriesJusqua('virement_fr',mm,jusquau)
+    +sumEntriesJusqua('remb_imp_py',mm,jusquau)+sumEntriesJusqua('remb_imp_caro',mm,jusquau)
+    +(mm>=5?sumEntriesJusqua('tel_caro_remb',mm,jusquau):0);
+  const epManuelDate = ['revenu_qc','pension_py','arg_commun','bon_coin','voiture','ep_py_qc','ret_py_qc','ebay','interets']
+      .reduce((s,p)=>s+sumEntriesJusqua('ca_vers_epp_'+p,mm,jusquau),0)
+    +['revenu_qc','ep_caro','arg_commun','bon_coin','voiture','ep_caro_qc','ret_caro_qc','interets']
+      .reduce((s,p)=>s+sumEntriesJusqua('ca_vers_epc_'+p,mm,jusquau),0)
+    +['revenu_qc','ep_caro','pension_py','arg_commun','perso_caro','perso_py','bon_coin','voiture','ep_py','ebay','interets']
+      .reduce((s,p)=>s+sumEntriesJusqua('ca_vers_epcom_'+p,mm,jusquau),0);
+  const menDate = sumEntriesJusqua('men_iga',mm,jusquau)+sumEntriesJusqua('men_topd',mm,jusquau)+sumEntriesJusqua('men_saq',mm,jusquau)
+    +sumEntriesJusqua('men_pharma',mm,jusquau)+sumEntriesJusqua('men_jt',mm,jusquau)+sumEntriesJusqua('men_atelier',mm,jusquau)+sumEntriesJusqua('men_autre',mm,jusquau);
+  const persoDate = sumEntriesJusqua('perso_py',mm,jusquau)+sumEntriesJusqua('perso_caro',mm,jusquau)
+    +sumEntriesJusqua('sante_py',mm,jusquau)+sumEntriesJusqua('sante_caro',mm,jusquau)
+    +sumEntriesJusqua('retrait_py',mm,jusquau)+sumEntriesJusqua('retrait_caro',mm,jusquau);
+  const divDate = sumEntriesJusqua('frais_div_v',mm,jusquau)+sumEntriesJusqua('ca_mut_cotis',mm,jusquau)
+    -sumEntriesJusqua('remb_frais_div',mm,jusquau);
+  const virEpEntrantsDate =
+    sumEntriesJusqua('epp_vir_revenu_qc',mm,jusquau)+sumEntriesJusqua('epp_vir_pension_py',mm,jusquau)+sumEntriesJusqua('epp_vir_arg_commun',mm,jusquau)
+    +sumEntriesJusqua('epp_vir_bon_coin',mm,jusquau)+sumEntriesJusqua('epp_vir_voiture',mm,jusquau)+sumEntriesJusqua('epp_vir_ep_py_qc',mm,jusquau)
+    +sumEntriesJusqua('epp_vir_ret_py_qc',mm,jusquau)+sumEntriesJusqua('epp_vir_ebay',mm,jusquau)+sumEntriesJusqua('epp_vir_interets',mm,jusquau)
+    +sumEntriesJusqua('epc_vir_revenu_qc',mm,jusquau)+sumEntriesJusqua('epc_vir_ep_caro',mm,jusquau)+sumEntriesJusqua('epc_vir_arg_commun',mm,jusquau)
+    +sumEntriesJusqua('epc_vir_bon_coin',mm,jusquau)+sumEntriesJusqua('epc_vir_voiture',mm,jusquau)+sumEntriesJusqua('epc_vir_ep_caro_qc',mm,jusquau)
+    +sumEntriesJusqua('epc_vir_ret_caro_qc',mm,jusquau)+sumEntriesJusqua('epc_vir_interets',mm,jusquau)
+    +sumEntriesJusqua('epcom_vir_revenu_qc',mm,jusquau)+sumEntriesJusqua('epcom_vir_ep_caro',mm,jusquau)+sumEntriesJusqua('epcom_vir_pension_py',mm,jusquau)
+    +sumEntriesJusqua('epcom_vir_arg_commun',mm,jusquau)+sumEntriesJusqua('epcom_vir_perso_caro',mm,jusquau)+sumEntriesJusqua('epcom_vir_perso_py',mm,jusquau)
+    +sumEntriesJusqua('epcom_vir_bon_coin',mm,jusquau)+sumEntriesJusqua('epcom_vir_voiture',mm,jusquau)+sumEntriesJusqua('epcom_vir_ep_py',mm,jusquau)
+    +sumEntriesJusqua('epcom_vir_ebay',mm,jusquau)+sumEntriesJusqua('epcom_vir_interets',mm,jusquau);
+  const virVersFrDate = sumEntriesJusqua('ca_vir_vers_fr',mm,jusquau);
+  const virDepuisFrDate = sumEntriesJusqua('ca_remb_depuis_fr',mm,jusquau);
+
+  return Math.round((calcSoldeCA(mm-1) + revDate - epFixe - epManuelDate - fixes - menBaseline - menDate - persoDate - divDate
+    + virEpEntrantsDate - virVersFrDate + virDepuisFrDate)*100)/100;
+}
+
 function ca_solde_det(){
   const m=selM;
   const soldePrev = m>0 ? calcSoldeCA(m-1) : SOLDE_INIT;
@@ -4831,6 +4917,17 @@ function ca_solde_det(){
       </div>
       <div class="msub">Calculé dynamiquement</div>
     </div>
+    ${(function(){
+      const today=new Date();
+      if(today.getFullYear()!==2026||today.getMonth()!==m) return '';
+      const jusquau=today.toLocaleDateString('fr-CA');
+      const soldeJour=calcSoldeCAJour(m,jusquau);
+      return `<div class="metric" style="border-left:3px solid var(--amb)">
+        <div class="mlabel">Solde au ${today.getDate()} ${MOIS_FULL[m]}</div>
+        <div class="mval" style="color:var(--amb)">${fc(soldeJour)}</div>
+        <div class="msub">Saisies réelles à ce jour — à comparer à la banque</div>
+      </div>`;
+    })()}
   </div>
 
   <!-- Virement vers Compte Principal France -->
