@@ -4688,7 +4688,7 @@ function calcSoldeCA(mm){
   // Frais communs fixes — correction remplace Excel si saisie
   const logCorr=sumEntries('log_mtl',mm); const elecCorr=sumEntries('elec_apt',mm);
   const elecHasEntry=(()=>{const e=loadEntries();return e['elec_apt']&&e['elec_apt'][mm]&&e['elec_apt'][mm].length>0;})();
-  const gmCorr=sumEntries('gm_cor',mm); const alCorr=sumEntries('ass_log_cor',mm);
+  const gmCorr=sumEntries('garde_meuble',mm); const alCorr=sumEntries('ass_log',mm);
   const tpyCorr=sumEntries('tel_py',mm); const tcaCorr=sumEntries('tel_caro_v',mm);
   const mpyCorr=sumEntries('metro_py_v',mm); const mcaCorr=sumEntries('metro_caro_v',mm);
   const logement=logCorr?logCorr:(CA.logement[mm]||0);
@@ -4775,7 +4775,7 @@ function calcSoldeCAJour(mm, jusquau){
   // Frais fixes (fixe, non daté) — même calcul que calcSoldeCA
   const logCorr=sumEntries('log_mtl',mm); const elecCorr=sumEntries('elec_apt',mm);
   const elecHasEntry=(()=>{const e=loadEntries();return e['elec_apt']&&e['elec_apt'][mm]&&e['elec_apt'][mm].length>0;})();
-  const gmCorr=sumEntries('gm_cor',mm); const alCorr=sumEntries('ass_log_cor',mm);
+  const gmCorr=sumEntries('garde_meuble',mm); const alCorr=sumEntries('ass_log',mm);
   const tpyCorr=sumEntries('tel_py',mm); const tcaCorr=sumEntries('tel_caro_v',mm);
   const mpyCorr=sumEntries('metro_py_v',mm); const mcaCorr=sumEntries('metro_caro_v',mm);
   const logement=logCorr?logCorr:(CA.logement[mm]||0);
@@ -5023,8 +5023,8 @@ function ca_solde_det(){
         <td class="amt neg" style="padding:8px 13px;color:var(--red)">${(()=>{
           const _log=sumEntries('log_mtl',m)||CA.logement[m]||0;
           const _el=sumEntries('elec_apt',m)||CA.elec[m]||0;
-          const _gm=sumEntries('gm_cor',m)||CA.garde_meuble[m]||0;
-          const _al=sumEntries('ass_log_cor',m)||CA.ass_log[m]||0;
+          const _gm=sumEntries('garde_meuble',m)||CA.garde_meuble[m]||0;
+          const _al=sumEntries('ass_log',m)||CA.ass_log[m]||0;
           const _nf=sumEntries('netflix_v',m)||CA.netflix[m]||0;
           const _sp=sumEntries('spotify_v',m)||CA.spotify[m]||0;
           const _vd=sumEntries('videotron_v',m)||CA.videotron[m]||0;
